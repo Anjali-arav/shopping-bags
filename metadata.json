@@ -1,0 +1,6 @@
+{
+  "name": "Luxe Handbags Store",
+  "description": "A premium, fully functional e-commerce website for luxury handbags inspired by Amazon, featuring a complete online shopping platform, customer dashboard, and an advanced admin management panel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
