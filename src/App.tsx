@@ -108,10 +108,41 @@ export default function App() {
   };
 
   // Save wishlist changes
-  const saveWishlist = (newWishlist: Product[]) => {
+  const saveWishlist = async (newWishlist: Product[]) => {
     setWishlist(newWishlist);
     localStorage.setItem("luxe_wishlist", JSON.stringify(newWishlist));
+
+    if (currentUser) {
+      try {
+        const prodIds = newWishlist.map((item) => item.id);
+        const res = await fetch(`/api/users/${currentUser.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ wishlist: prodIds })
+        });
+        if (res.ok) {
+          const updatedUser = await res.json();
+          setCurrentUser(updatedUser);
+          localStorage.setItem("luxe_user", JSON.stringify(updatedUser));
+        }
+      } catch (err) {
+        console.error("Failed to sync wishlist to server:", err);
+      }
+    }
   };
+
+  // Synchronize wishlist from logged-in user profile on backend
+  useEffect(() => {
+    if (currentUser && currentUser.wishlist && products.length > 0) {
+      const userWishlistProducts = products.filter((p) => currentUser.wishlist?.includes(p.id));
+      const currentIds = wishlist.map(p => p.id).sort().join(",");
+      const userIds = userWishlistProducts.map(p => p.id).sort().join(",");
+      if (currentIds !== userIds) {
+        setWishlist(userWishlistProducts);
+        localStorage.setItem("luxe_wishlist", JSON.stringify(userWishlistProducts));
+      }
+    }
+  }, [currentUser, products]);
 
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
@@ -1160,6 +1191,10 @@ export default function App() {
                   onAddToCart={(p, c, s) => {
                     handleAddToCart(p, c, s);
                     alert(`${p.name} added to cart!`);
+                  }}
+                  onUpdateProfile={(updatedUser) => {
+                    setCurrentUser(updatedUser);
+                    localStorage.setItem("luxe_user", JSON.stringify(updatedUser));
                   }}
                 />
               )}

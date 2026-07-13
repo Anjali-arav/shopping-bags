@@ -547,6 +547,29 @@ async function startServer() {
     res.json(safeUsers);
   });
 
+  app.put("/api/users/:id", (req, res) => {
+    const { id } = req.params;
+    const { name, phone, address, password, wishlist } = req.body;
+
+    const db = readDB();
+    const index = db.users.findIndex((u: any) => u.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (name !== undefined) db.users[index].name = name;
+    if (phone !== undefined) db.users[index].phone = phone;
+    if (address !== undefined) db.users[index].address = address;
+    if (password !== undefined) db.users[index].password = password;
+    if (wishlist !== undefined) db.users[index].wishlist = wishlist;
+
+    writeDB(db);
+
+    const { password: _, ...userSafe } = db.users[index];
+    res.json(userSafe);
+  });
+
   // Stats API (Admin Dashboard Overview)
   app.get("/api/dashboard/stats", (req, res) => {
     const db = readDB();

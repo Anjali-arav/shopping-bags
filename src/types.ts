@@ -22,6 +22,7 @@ export interface User {
   phone: string;
   address: string;
   isAdmin: boolean;
+  wishlist?: string[];
 }
 
 export interface Address {

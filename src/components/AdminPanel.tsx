@@ -18,7 +18,8 @@ import {
   Calendar,
   AlertTriangle,
   Upload,
-  UserCheck
+  UserCheck,
+  Heart
 } from "lucide-react";
 
 interface AdminPanelProps {
@@ -29,7 +30,7 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ adminUser, onLogout, onRefreshProducts, products }: AdminPanelProps) {
-  const [activeTab, setActiveTab] = useState<"dashboard" | "products" | "orders" | "customers" | "enquiries">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "products" | "orders" | "customers" | "enquiries" | "wishlists">("dashboard");
   const [stats, setStats] = useState({
     totalCustomers: 0,
     totalOrders: 0,
@@ -102,6 +103,36 @@ export default function AdminPanel({ adminUser, onLogout, onRefreshProducts, pro
   useEffect(() => {
     fetchStatsAndData();
   }, [activeTab]);
+
+  const getCustomerOrderCount = (customer: User) => {
+    return orders.filter((o) => o.customerName === customer.name || (o as any).userId === customer.id).length;
+  };
+
+  const getCustomerWishlistNames = (customer: User) => {
+    if (!customer.wishlist || customer.wishlist.length === 0) return "";
+    return customer.wishlist
+      .map((id) => products.find((p) => p.id === id)?.name)
+      .filter((name) => name)
+      .join(", ");
+  };
+
+  const getMostLikedHandbags = () => {
+    const counts: Record<string, number> = {};
+    customers.forEach((c) => {
+      if (c.wishlist) {
+        c.wishlist.forEach((prodId) => {
+          counts[prodId] = (counts[prodId] || 0) + 1;
+        });
+      }
+    });
+
+    return products
+      .map((p) => ({
+        product: p,
+        count: counts[p.id] || 0
+      }))
+      .sort((a, b) => b.count - a.count);
+  };
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
@@ -348,6 +379,16 @@ export default function AdminPanel({ adminUser, onLogout, onRefreshProducts, pro
           }`}
         >
           Store Inquiries ({enquiries.length})
+        </button>
+        <button
+          onClick={() => { setActiveTab("wishlists"); setIsEditing(false); }}
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+            activeTab === "wishlists"
+              ? "bg-blue-950 text-white shadow-md"
+              : "bg-white border border-gray-150 text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          Wishlists & Trends
         </button>
       </div>
 
@@ -847,7 +888,7 @@ export default function AdminPanel({ adminUser, onLogout, onRefreshProducts, pro
               >
                 <div>
                   <h3 className="text-xl font-extrabold text-blue-950">Active Customers List</h3>
-                  <p className="text-xs text-gray-500 mt-1">Direct customer retail directory</p>
+                  <p className="text-xs text-gray-500 mt-1">Direct customer retail directory with order histories and active wishlists</p>
                 </div>
 
                 <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-xs">
@@ -856,8 +897,9 @@ export default function AdminPanel({ adminUser, onLogout, onRefreshProducts, pro
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 font-bold uppercase tracking-wider">
                           <th className="p-4">Customer Details</th>
-                          <th className="p-4">Contact Details</th>
-                          <th className="p-4">Delivery Address</th>
+                          <th className="p-4">Contact & Address</th>
+                          <th className="p-4">Orders Placed</th>
+                          <th className="p-4">Wishlist Items</th>
                           <th className="p-4 text-right">Account Verification</th>
                         </tr>
                       </thead>
@@ -872,15 +914,34 @@ export default function AdminPanel({ adminUser, onLogout, onRefreshProducts, pro
                                 <span>{c.name}</span>
                               </div>
                             </td>
-                            <td className="p-4">
-                              <p className="font-medium">{c.email}</p>
-                              <p className="text-gray-400 mt-0.5">{c.phone || "No phone linked"}</p>
+                            <td className="p-4 space-y-1">
+                              <p className="font-medium text-gray-900">{c.email}</p>
+                              <p className="text-gray-400 text-[11px]">{c.phone || "No phone linked"}</p>
+                              <p className="text-gray-500 text-[10px] max-w-[14rem] truncate" title={c.address}>
+                                {c.address || "No address saved"}
+                              </p>
                             </td>
-                            <td className="p-4 max-w-[16rem] truncate" title={c.address}>
-                              {c.address || "Address not provided yet"}
+                            <td className="p-4">
+                              <span className="px-2.5 py-1 bg-blue-50 text-blue-950 font-bold rounded-lg text-[10px]">
+                                {getCustomerOrderCount(c)} order(s)
+                              </span>
+                            </td>
+                            <td className="p-4 max-w-[15rem]">
+                              {c.wishlist && c.wishlist.length > 0 ? (
+                                <div className="space-y-1">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 font-bold rounded-md text-[9px]">
+                                    <Heart size={10} className="fill-amber-600" /> {c.wishlist.length} item(s)
+                                  </span>
+                                  <p className="text-[10px] text-gray-500 truncate" title={getCustomerWishlistNames(c)}>
+                                    {getCustomerWishlistNames(c)}
+                                  </p>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 italic text-[11px]">Empty Wishlist</span>
+                              )}
                             </td>
                             <td className="p-4 text-right text-emerald-600 font-bold uppercase tracking-wider">
-                              <span className="inline-flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1 rounded-md">
+                              <span className="inline-flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1 rounded-md text-[10px]">
                                 <UserCheck size={12} /> Verified Member
                               </span>
                             </td>
@@ -888,7 +949,7 @@ export default function AdminPanel({ adminUser, onLogout, onRefreshProducts, pro
                         ))}
                         {customers.length === 0 && (
                           <tr>
-                            <td colSpan={4} className="p-8 text-center text-gray-400 font-medium">No customers registered yet.</td>
+                            <td colSpan={5} className="p-8 text-center text-gray-400 font-medium">No customers registered yet.</td>
                           </tr>
                         )}
                       </tbody>
@@ -958,6 +1019,135 @@ export default function AdminPanel({ adminUser, onLogout, onRefreshProducts, pro
                       No client messages or enquiries logged.
                     </div>
                   )}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Tab: WISHLISTS & TRENDS */}
+            {activeTab === "wishlists" && (
+              <motion.div
+                key="wishlists"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 15 }}
+                className="space-y-6"
+              >
+                <div>
+                  <h3 className="text-xl font-extrabold text-blue-950">Wishlist & Design Trends</h3>
+                  <p className="text-xs text-gray-500 mt-1">Real-time statistics on customer favorites and most wanted premium handbags</p>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left: Popularity list */}
+                  <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl p-6 shadow-xs space-y-6">
+                    <h4 className="text-base font-extrabold text-blue-950 flex items-center gap-2">
+                      <Heart size={16} className="text-rose-500 fill-rose-500" /> Most Liked Handbags Ranking
+                    </h4>
+
+                    <div className="space-y-5">
+                      {getMostLikedHandbags().map(({ product, count }, index) => {
+                        const totalUsersCount = Math.max(customers.length, 1);
+                        const percentage = Math.round((count / totalUsersCount) * 100);
+
+                        return (
+                          <div key={product.id} className="flex gap-4 items-center bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+                            {/* Rank Badge */}
+                            <span className="text-sm font-black text-gray-400 w-6 text-center">
+                              #{index + 1}
+                            </span>
+
+                            {/* Product Info */}
+                            <img
+                              src={product.images[0]}
+                              alt=""
+                              className="w-14 h-14 rounded-lg object-cover border border-gray-100 bg-white shrink-0"
+                            />
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-start gap-2">
+                                <div>
+                                  <h5 className="font-bold text-xs text-gray-900 truncate">{product.name}</h5>
+                                  <span className="text-[9px] font-bold text-amber-600 uppercase tracking-wider">{product.category}</span>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <span className="font-extrabold text-xs text-blue-950 block">₹{product.price}</span>
+                                  <span className="text-[10px] text-gray-400">Stock: {product.stock} left</span>
+                                </div>
+                              </div>
+
+                              {/* Progress bar representing interest */}
+                              <div className="mt-3 space-y-1">
+                                <div className="flex justify-between text-[10px] font-semibold text-gray-500">
+                                  <span>Popularity Interest</span>
+                                  <span className="text-amber-600 font-extrabold">{count} Saves ({percentage}%)</span>
+                                </div>
+                                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-gradient-to-r from-amber-500 to-amber-600 rounded-full transition-all duration-500"
+                                    style={{ width: `${Math.max(percentage, count > 0 ? 5 : 0)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Right: Summary trends metrics */}
+                  <div className="lg:col-span-1 space-y-6">
+                    <div className="bg-gradient-to-br from-blue-950 to-blue-900 text-white rounded-2xl p-6 shadow-md space-y-4">
+                      <h4 className="text-base font-extrabold tracking-tight">Couture Metrics</h4>
+                      <p className="text-xs text-blue-100 leading-relaxed">
+                        Design trend dashboards help evaluate client preference shifts in color and model classes. Set discount margins for low-save designs to clear stock, and restock highly desired bags!
+                      </p>
+
+                      <div className="pt-4 border-t border-white/10 space-y-3.5 text-xs">
+                        <div className="flex justify-between text-blue-200">
+                          <span>Total User Accounts</span>
+                          <strong className="text-white">{customers.length}</strong>
+                        </div>
+                        <div className="flex justify-between text-blue-200">
+                          <span>Collective Saves</span>
+                          <strong className="text-white">
+                            {customers.reduce((acc, c) => acc + (c.wishlist?.length || 0), 0)} items
+                          </strong>
+                        </div>
+                        <div className="flex justify-between text-blue-200">
+                          <span>Most Wanted Category</span>
+                          <strong className="text-white uppercase">
+                            {(() => {
+                              const catCounts: Record<string, number> = {};
+                              customers.forEach((c) => {
+                                if (c.wishlist) {
+                                  c.wishlist.forEach((id) => {
+                                    const p = products.find((prod) => prod.id === id);
+                                    if (p) catCounts[p.category] = (catCounts[p.category] || 0) + 1;
+                                  });
+                                }
+                              });
+                              const entries = Object.entries(catCounts);
+                              return entries.length > 0 ? entries.sort((a, b) => b[1] - a[1])[0][0] : "Classic";
+                            })()}
+                          </strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-gray-150 rounded-2xl p-6 shadow-xs space-y-4">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Staff Recommendation</h4>
+                      <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl flex gap-3 items-start text-xs text-amber-900">
+                        <AlertTriangle size={18} className="shrink-0 text-amber-600 mt-0.5" />
+                        <div>
+                          <p className="font-bold">Restock alert!</p>
+                          <p className="mt-1 leading-relaxed text-amber-800">
+                            The bags showing above 40% interest with less than 5 units left require immediate boutique re-ordering.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}

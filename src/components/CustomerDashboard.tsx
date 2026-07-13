@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { User, Order, Product } from "../types";
 import { motion, AnimatePresence } from "motion/react";
-import { UserCircle, ShoppingBag, Heart, MapPin, Phone, Mail, Clock, ShieldCheck, ShoppingCart, Trash2 } from "lucide-react";
+import { UserCircle, ShoppingBag, Heart, MapPin, Phone, Mail, Clock, ShieldCheck, ShoppingCart, Trash2, Edit3, Lock, Check } from "lucide-react";
 
 interface CustomerDashboardProps {
   user: User;
@@ -9,6 +9,7 @@ interface CustomerDashboardProps {
   wishlist: Product[];
   onToggleWishlist: (product: Product) => void;
   onAddToCart: (product: Product, selectedColor: any, selectedSize: string) => void;
+  onUpdateProfile: (updatedUser: User) => void;
 }
 
 export default function CustomerDashboard({
@@ -16,11 +17,39 @@ export default function CustomerDashboard({
   onLogout,
   wishlist,
   onToggleWishlist,
-  onAddToCart
+  onAddToCart,
+  onUpdateProfile
 }: CustomerDashboardProps) {
   const [activeTab, setActiveTab] = useState<"orders" | "wishlist" | "profile">("orders");
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
+
+  // Profile Edit State
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: user.name,
+    phone: user.phone || "",
+    address: user.address || ""
+  });
+  const [passwordForm, setPasswordForm] = useState({
+    oldPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
+  const [profileError, setProfileError] = useState("");
+  const [profileSuccess, setProfileSuccess] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+
+  // Sync profile form when user prop changes
+  useEffect(() => {
+    setProfileForm({
+      name: user.name,
+      phone: user.phone || "",
+      address: user.address || ""
+    });
+  }, [user]);
 
   // Fetch orders when dashboard opens
   useEffect(() => {
@@ -41,6 +70,78 @@ export default function CustomerDashboard({
 
     fetchUserOrders();
   }, [user.id, activeTab]);
+
+  const handleUpdateProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileError("");
+    setProfileSuccess("");
+
+    if (!profileForm.name || !profileForm.phone) {
+      setProfileError("Name and mobile phone are strictly required.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/users/${user.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: profileForm.name,
+          phone: profileForm.phone,
+          address: profileForm.address
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        onUpdateProfile(data);
+        setProfileSuccess("Profile details updated successfully!");
+        setIsEditingProfile(false);
+      } else {
+        const err = await response.json();
+        setProfileError(err.error || "Failed to update profile details.");
+      }
+    } catch (error) {
+      setProfileError("Something went wrong. Please try again.");
+    }
+  };
+
+  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    if (!passwordForm.newPassword || !passwordForm.confirmPassword) {
+      setPasswordError("Please enter your new password and confirm it.");
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError("New passwords do not match.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/users/${user.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: passwordForm.newPassword
+        })
+      });
+
+      if (response.ok) {
+        setPasswordSuccess("Password changed successfully!");
+        setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
+        setIsChangingPassword(false);
+      } else {
+        const err = await response.json();
+        setPasswordError(err.error || "Failed to change password.");
+      }
+    } catch (error) {
+      setPasswordError("Something went wrong. Please try again.");
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-8 py-10">
@@ -308,73 +409,251 @@ export default function CustomerDashboard({
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 15 }}
-                className="bg-white border border-gray-100 rounded-2xl shadow-xs p-6 md:p-8 space-y-6"
+                className="space-y-6"
               >
-                <h3 className="text-xl font-extrabold text-blue-950 border-b border-gray-100 pb-4">
-                  Account Details
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Name field */}
-                  <div className="flex gap-3 items-start">
-                    <div className="p-2.5 bg-blue-50 text-blue-900 rounded-lg">
-                      <UserCircle size={20} />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Full Name</p>
-                      <p className="text-sm font-semibold text-gray-800 mt-1">{user.name}</p>
-                    </div>
+                {/* 1. Profile Details Section */}
+                <div className="bg-white border border-gray-100 rounded-2xl shadow-xs p-6 md:p-8 space-y-6">
+                  <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+                    <h3 className="text-lg font-extrabold text-blue-950 flex items-center gap-2">
+                      <UserCircle className="text-amber-500" size={22} />
+                      Personal Profile Details
+                    </h3>
+                    {!isEditingProfile && (
+                      <button
+                        onClick={() => {
+                          setIsEditingProfile(true);
+                          setProfileError("");
+                          setProfileSuccess("");
+                        }}
+                        className="flex items-center gap-1.5 px-4 py-1.5 bg-gray-100 hover:bg-amber-500 hover:text-white text-gray-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                      >
+                        <Edit3 size={13} /> Edit Profile
+                      </button>
+                    )}
                   </div>
 
-                  {/* Email field */}
-                  <div className="flex gap-3 items-start">
-                    <div className="p-2.5 bg-blue-50 text-blue-900 rounded-lg">
-                      <Mail size={20} />
+                  {profileSuccess && (
+                    <div className="p-3 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-lg flex items-center gap-1.5">
+                      <Check size={16} /> {profileSuccess}
                     </div>
-                    <div>
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Email Address</p>
-                      <p className="text-sm font-semibold text-gray-800 mt-1">{user.email}</p>
-                    </div>
-                  </div>
+                  )}
 
-                  {/* Phone Field */}
-                  <div className="flex gap-3 items-start">
-                    <div className="p-2.5 bg-blue-50 text-blue-900 rounded-lg">
-                      <Phone size={20} />
+                  {profileError && (
+                    <div className="p-3 bg-rose-50 text-rose-700 text-xs font-semibold rounded-lg">
+                      {profileError}
                     </div>
-                    <div>
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Mobile Number</p>
-                      <p className="text-sm font-semibold text-gray-800 mt-1">{user.phone || "+91 8919449475"}</p>
-                    </div>
-                  </div>
+                  )}
 
-                  {/* Account Security */}
-                  <div className="flex gap-3 items-start">
-                    <div className="p-2.5 bg-blue-50 text-blue-900 rounded-lg">
-                      <Clock size={20} />
+                  {!isEditingProfile ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Name field */}
+                      <div className="flex gap-3 items-start">
+                        <div className="p-2.5 bg-blue-50 text-blue-900 rounded-lg">
+                          <UserCircle size={20} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Full Name</p>
+                          <p className="text-sm font-semibold text-gray-800 mt-1">{user.name}</p>
+                        </div>
+                      </div>
+
+                      {/* Email field */}
+                      <div className="flex gap-3 items-start">
+                        <div className="p-2.5 bg-blue-50 text-blue-900 rounded-lg">
+                          <Mail size={20} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Email Address</p>
+                          <p className="text-sm font-semibold text-gray-800 mt-1">{user.email}</p>
+                        </div>
+                      </div>
+
+                      {/* Phone Field */}
+                      <div className="flex gap-3 items-start">
+                        <div className="p-2.5 bg-blue-50 text-blue-900 rounded-lg">
+                          <Phone size={20} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Mobile Number</p>
+                          <p className="text-sm font-semibold text-gray-800 mt-1">{user.phone || "Not specified"}</p>
+                        </div>
+                      </div>
+
+                      {/* Account Security */}
+                      <div className="flex gap-3 items-start">
+                        <div className="p-2.5 bg-blue-50 text-blue-900 rounded-lg">
+                          <Clock size={20} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Account Status</p>
+                          <p className="text-sm font-semibold text-emerald-600 mt-1 flex items-center gap-1.5">
+                            <ShieldCheck size={16} /> Active Verified Customer
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Account Status</p>
-                      <p className="text-sm font-semibold text-emerald-600 mt-1 flex items-center gap-1.5">
-                        <ShieldCheck size={16} /> Active Verified Customer
-                      </p>
+                  ) : (
+                    <form onSubmit={handleUpdateProfileSubmit} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Full Name *</label>
+                          <input
+                            type="text"
+                            required
+                            value={profileForm.name}
+                            onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-900 focus:bg-white text-gray-800 font-medium"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Mobile Number *</label>
+                          <input
+                            type="tel"
+                            required
+                            value={profileForm.phone}
+                            onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-900 focus:bg-white text-gray-800 font-medium"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Shipping Address</label>
+                        <textarea
+                          rows={3}
+                          value={profileForm.address}
+                          onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
+                          className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-900 focus:bg-white text-gray-800 font-medium resize-none"
+                          placeholder="Your complete shipping address..."
+                        />
+                      </div>
+
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsEditingProfile(false);
+                            setProfileForm({
+                              name: user.name,
+                              phone: user.phone || "",
+                              address: user.address || ""
+                            });
+                          }}
+                          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2 bg-blue-950 hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-md"
+                        >
+                          Save Changes
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {!isEditingProfile && (
+                    <div className="p-5 bg-gray-50 border border-gray-100 rounded-xl mt-4">
+                      <div className="flex gap-3 items-start">
+                        <div className="p-2 bg-amber-100 text-amber-700 rounded-lg">
+                          <MapPin size={18} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Primary Shipping Address</p>
+                          <p className="text-sm text-gray-700 font-semibold mt-1.5 leading-relaxed">
+                            {user.address || "No shipping address saved yet. Configure one during checkout!"}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
-                {/* Primary Shipping Address block */}
-                <div className="p-5 bg-gray-50 border border-gray-150 rounded-xl mt-4">
-                  <div className="flex gap-3 items-start">
-                    <div className="p-2 bg-amber-100 text-amber-700 rounded-lg">
-                      <MapPin size={18} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Primary Shipping Address</p>
-                      <p className="text-sm text-gray-700 font-semibold mt-1.5 leading-relaxed">
-                        {user.address || "No shipping address saved yet. Configure one during checkout!"}
-                      </p>
-                    </div>
+                {/* 2. Security / Password Update Section */}
+                <div className="bg-white border border-gray-100 rounded-2xl shadow-xs p-6 md:p-8 space-y-6">
+                  <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+                    <h3 className="text-lg font-extrabold text-blue-950 flex items-center gap-2">
+                      <Lock className="text-amber-500" size={20} />
+                      Account Security & Password
+                    </h3>
+                    {!isChangingPassword && (
+                      <button
+                        onClick={() => {
+                          setIsChangingPassword(true);
+                          setPasswordError("");
+                          setPasswordSuccess("");
+                        }}
+                        className="flex items-center gap-1.5 px-4 py-1.5 bg-gray-100 hover:bg-amber-500 hover:text-white text-gray-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                      >
+                        <Lock size={13} /> Change Password
+                      </button>
+                    )}
                   </div>
+
+                  {passwordSuccess && (
+                    <div className="p-3 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-lg flex items-center gap-1.5">
+                      <Check size={16} /> {passwordSuccess}
+                    </div>
+                  )}
+
+                  {passwordError && (
+                    <div className="p-3 bg-rose-50 text-rose-700 text-xs font-semibold rounded-lg">
+                      {passwordError}
+                    </div>
+                  )}
+
+                  {!isChangingPassword ? (
+                    <div className="text-xs text-gray-500 flex items-center gap-2.5">
+                      <ShieldCheck size={20} className="text-emerald-600" />
+                      <span>Your password is secure. You can update your account password at any time using verified credentials.</span>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleChangePasswordSubmit} className="space-y-4 max-w-md">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">New Password *</label>
+                        <input
+                          type="password"
+                          required
+                          value={passwordForm.newPassword}
+                          onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                          className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-900 focus:bg-white text-gray-800"
+                          placeholder="At least 6 characters"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Confirm New Password *</label>
+                        <input
+                          type="password"
+                          required
+                          value={passwordForm.confirmPassword}
+                          onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                          className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-900 focus:bg-white text-gray-800"
+                          placeholder="Confirm your password"
+                        />
+                      </div>
+
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsChangingPassword(false);
+                            setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
+                          }}
+                          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2 bg-blue-950 hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-md"
+                        >
+                          Change Password
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               </motion.div>
             )}
